@@ -52,3 +52,28 @@ def get_results():
     for filename, data in all_results.items():
         parsed[filename] = json.loads(data)
     return parsed
+@app.get("/search")
+async def search_documents(query: str):
+    from vector_store import search_similar
+    
+    if not query:
+        return {"error": "Query dalo bhai!"}
+    
+    results = search_similar(query)
+    
+    if not results:
+        return {"message": "Koi similar document nahi mila", "results": []}
+    
+    formatted = []
+    for match in results:
+        formatted.append({
+            "filename": match.metadata.get("filename"),
+            "category": match.metadata.get("category"),
+            "similarity_score": round(match.score, 3),
+            "preview": match.metadata.get("preview", "")[:100]
+        })
+    
+    return {
+        "query": query,
+        "results": formatted
+    }
