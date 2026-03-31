@@ -6,6 +6,7 @@ from classifier import classify_document
 from vector_store import store_document
 from dotenv import load_dotenv
 import os
+import pytesseract
 
 load_dotenv()
 
@@ -24,12 +25,25 @@ def extract_text_from_pdf(file_path):
         print(f" PDF read nahi hua: {e}")
         return "pdf read error"
 
+
+
 def extract_text_from_image(file_path):
     try:
         img = Image.open(file_path)
-        width, height = img.size
-        mode = img.mode
-        return f"image width:{width} height:{height} mode:{mode}"
+        
+        # OCR se text nikalo
+        text = pytesseract.image_to_string(img)
+        
+        if text.strip():
+            print(f" OCR se text mila: {text[:100]}")
+            return text
+        else:
+            # Agar text nahi mila toh image info return karo
+            width, height = img.size
+            mode = img.mode
+            print(f" Text nahi mila — image info use kar raha hoon")
+            return f"image width:{width} height:{height} mode:{mode}"
+            
     except Exception as e:
         print(f" Image read nahi hui: {e}")
         return "image read error"
@@ -46,6 +60,12 @@ def process_task(task):
             print(f" File nahi mili: {file_path}")
             return
 
+        # Supported formats check karo
+        supported = (".pdf", ".jpg", ".jpeg", ".png")
+        if not filename.lower().endswith(supported):
+            print(f" Unsupported file type — skip kar raha hoon: {filename}")
+            return
+
         # File type check karo
         if filename.lower().endswith(".pdf"):
             content = extract_text_from_pdf(file_path)
@@ -53,9 +73,6 @@ def process_task(task):
         elif filename.lower().endswith((".jpg", ".jpeg", ".png")):
             content = extract_text_from_image(file_path)
             file_type = "image"
-        else:
-            content = "unknown file type"
-            file_type = "unknown"
 
         # Classify karo
         category = classify_document(content)
@@ -68,7 +85,6 @@ def process_task(task):
         print(f" Category: {category}")
         print(f" Content preview: {content[:100]}")
 
-        # Result Redis mein store karo
         result = {
             "filename": filename,
             "file_type": file_type,
@@ -76,6 +92,15 @@ def process_task(task):
             "status": "completed"
         }
         r.hset("results", filename, json.dumps(result))
+
+    except Exception as e:
+        print(f" Error processing task: {e}")
+        result = {
+            "filename": task.get("filename", "unknown"),
+            "status": "failed",
+            "error": str(e)
+        }
+        r.hset("results", task.get("filename", "unknown"), json.dumps(result))
 
     except Exception as e:
         print(f" Error processing task: {e}")

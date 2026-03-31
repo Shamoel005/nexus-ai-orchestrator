@@ -18,10 +18,19 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 def home():
     return {"message": "Nexus API chal raha hai!"}
 
+
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
     
-    # File save karo uploads folder mein
+    # Supported formats check karo
+    supported = (".pdf", ".jpg", ".jpeg", ".png")
+    if not file.filename.lower().endswith(supported):
+        return {
+            "error": f"Unsupported file type! Sirf PDF, JPG, JPEG, PNG allowed hain.",
+            "filename": file.filename
+        }
+    
+    # File save karo
     file_path = os.path.join(UPLOAD_FOLDER, file.filename)
     with open(file_path, "wb") as f:
         shutil.copyfileobj(file.file, f)
@@ -38,7 +47,6 @@ async def upload_file(file: UploadFile = File(...)):
         "filename": file.filename,
         "status": "Queue mein daal diya"
     }
-
 @app.get("/status")
 def get_status():
     queue_length = r.llen("task_queue")
